@@ -7,6 +7,7 @@
  * Released as-is with no warranty or claim of usability for any purpose.
  */
  const {addMaintenanceStatusMessage} = require('./api');
+ const {logError} = require('./log');
  async function handleHelpCommand(msg, cmd, args) {
    let whatToShow = 'main';
    // legacy help commands
@@ -89,7 +90,7 @@
      + 'Anyone can click the :game_die: reaction to reroll any *recent* roll.\n'
      + 'Remove and re-add your reaction to keep re-rolling that roll.\n'
      + '\n'
-     + 'Patreon: <https://patreon.com/nathanhawks> | <@360086569778020352>'
+     + 'Project and source code: <https://github.com/RHabenicht/SR1eGameBot>'
    ;
    let init1 =
        '\n:boom: **Initiative System** :boom:\n'
@@ -159,7 +160,7 @@
      + '\n'
      + '**See also:** !help gmscreen\n'
      + '\n'
-     + 'Patreon: <https://patreon.com/nathanhawks> | <@360086569778020352>'
+     + 'Project and source code: <https://github.com/RHabenicht/SR1eGameBot>'
    ;
    let scene1 = '\n:blue_book: **Prepared Scenes with (or without) Music** :blue_book:\n'
      + '\n'
@@ -184,7 +185,7 @@
      + '\n'
      + '**See also:** !help gmscreen\n'
      + '\n'
-     + 'Patreon: <https://patreon.com/nathanhawks> | <@360086569778020352>';
+     + 'Project and source code: <https://github.com/RHabenicht/SR1eGameBot>';
    ;
    let macros1 = '\n:scroll: **Macros (Saved Rolls)** :scroll:\n'
      + '\n'
@@ -204,7 +205,7 @@
      + '\n'
      + '**Pro tip:** Don\'t forget you can have multiple dice rolls in a single command by separating the rolls with semicolons (;)\n'
      + '\n'
-     + 'Patreon: <https://patreon.com/nathanhawks> | <@360086569778020352>'
+     + 'Project and source code: <https://github.com/RHabenicht/SR1eGameBot>'
    ;
    let gmscreen1 = '\n:ninja: **Virtual GM Screen** :ninja:\n\n'
      + 'Using this feature, **reminders**, **initiative** and **scene** commands can be done in a hidden channel.\n'
@@ -227,7 +228,7 @@
      + ':arrow_forward: !getscene will output to the play channel so you don\'t need to reveal your scene titles.\n'
      + ':arrow_forward: You can now run !init in secret, or you can prep your NPC\'s in the secret channel and then do the !init command in the play channel.\n'
      + '\n'
-     + 'Patreon: <https://patreon.com/nathanhawks> | <@360086569778020352>'
+     + 'Project and source code: <https://github.com/RHabenicht/SR1eGameBot>'
    ;
    let reminders1 = '\n:alarm_clock: **Reminders** :alarm_clock:\n\n'
      + 'The bot can DM reminders of your upcoming game sessions to your players.\n\n'
@@ -248,7 +249,7 @@
      + '**!cancelreminder** id#1 id#2 etc\n'
      + 'Cancels one or more reminders. See `!listreminders` to get the ID\'s.\n'
      + '\n'
-     + 'Patreon: <https://patreon.com/nathanhawks> | <@360086569778020352>'
+     + 'Project and source code: <https://github.com/RHabenicht/SR1eGameBot>'
    ;
    let ammo1 = '\n:gun: **Ammo Tracking** :gun:\n\n'
      + 'GameBot can track ammo during combat, enforcing max ROF and weapon capacity.\n\n'
@@ -283,7 +284,7 @@
      + 'The second form allows you to specify which type of round you want to load, for cases where your weapon has multiple compatible ammoTypes *and* you have compatible ammo entries for 2 or more of those ammoTypes.\n'
      + '**Example:** `!ammo reload enfield shot`\n'
      + '\n'
-     + 'Patreon: <https://patreon.com/nathanhawks> | <@360086569778020352>'
+     + 'Project and source code: <https://github.com/RHabenicht/SR1eGameBot>'
    ;
    let troubleshoot1 = '\n:fire_extinguisher: **Troubleshooting** :fire_extinguisher:\n\n'
      + 'GameBot undoubtedly still has bugs.\n'
@@ -294,9 +295,8 @@
      + 'Report any suspected bugs with a screenshot showing the time of the command. '
      + 'Also mention your timezone.\n'
      + '\n'
-     + 'You can report suspected bugs at <https://github.com/NathanHawks/SR1eGameBot/issues>.'
+     + "If the problem continues, contact this bot's maintainer. Project: <https://github.com/RHabenicht/SR1eGameBot>."
      + '\n'
-     + 'If we don\'t share a server, you can also find me on Classic Shadowrun: https://discord.gg/HBDPU6k\n'
    ;
    switch (whatToShow) {
      case 'index':

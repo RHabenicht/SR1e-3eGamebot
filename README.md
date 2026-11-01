@@ -156,6 +156,8 @@ GameBot connects out to Discord. It doesn't run a website or expose an HTTP heal
 
 All commands start with `!`. Capitalization doesn't matter.
 
+Dice commands accept up to **100 dice per pool**, including the opponent's pool, and **10 rolls per command**. Invalid dice counts are rejected before any dice are rolled.
+
 ### Basic rolls
 
 | Command | Result |
@@ -220,6 +222,8 @@ resist wagemage sorcery !3! TN4
 ### Rerolls
 
 Use the dice reaction on a recent roll to roll it again. To reroll a second time, remove your reaction and add it again.
+
+Dice reactions work on dice commands and `!roll` saved rolls. They cannot repeat settings or deletion commands.
 
 Rerolls aren't restricted to the player who made the original roll.
 

@@ -16,7 +16,7 @@ const {
 async function handleSaveMacroCommand(msg, args) {
   if (!msg.channel.guild) {
     msg.reply(`This command doesn't work via DM. You must be in a server channel.`)
-    .catch((e)=>{error.log(e);});
+    .catch(logError);
     return;
   }
   if (args.length < 2)
@@ -79,15 +79,13 @@ async function handleSaveMacroCommand(msg, args) {
 }
 async function handleRollMacroCommand(msg, cmd, args, user) {
   if (!msg.channel.guild) {
-    msg.reply(`This command doesn't work via DM. You must be in a server channel.`)
-    .catch((e)=>{error.log(e);});
-    return;
+    return msg.reply(`This command doesn't work via DM. You must be in a server channel.`)
+      .catch(logError);
   }
   // coexist with Dice Maiden;
-  // hat tip https://stackoverflow.com/questions/43564985/regex-for-dice-rolling-system-and-capturing-using-javascript
-  let argsString = args.join(' ');
-  let argsStringMatches = argsString.match(/(\d*)(D\d*)((?:[+*-](?:\d+|\([A-Z]*\)))*)(?:\+(D\d*))?/i);
-  if (argsStringMatches && argsStringMatches.length > 0) {
+  const argsString = args.join(' ');
+  const diceNotation = /^(?:\d+)?d\d+(?:[+*-](?:\d+|\([a-z]+\)))*(?:\+(?:\d+)?d\d+)?(?:\s|$)/i;
+  if (diceNotation.test(argsString)) {
     logSpam(`Coexisting with Dice Maiden (by ignoring !roll ${argsString})`);
     return;
   }
@@ -97,54 +95,34 @@ async function handleRollMacroCommand(msg, cmd, args, user) {
     )).catch((e) => { logError(e); });
   logWrite('\x1b[32m [ ==================== handleRollMacroCommand ================== ]\x1b[0m');
   addHourglass(msg);
-  await ensureTriplet(msg);
-  const filename = 'savedRolls';
-  const parentFolderID = await findUserFolderDBIDFromMsg(msg);
-  if (parentFolderID === -1) return -1;
-  const savedRollsFileID = await findStringIDByName(filename, parentFolderID);
-  let savedRollsStr = '';
-  let savedRollsArr = [];
-  const savedRollsNames = [];
-  const inputName = args[0];
-  if (savedRollsFileID !== -1) {
-    // get existing file content
-    savedRollsStr = await getStringContent(savedRollsFileID);
-    if (savedRollsStr) {
-      savedRollsArr = savedRollsStr.split("\n");
-      // get an index of name per line
-      savedRollsArr.forEach((macro)=>{
-        let tmpArr = macro.split(" ");
-        savedRollsNames[savedRollsNames.length] = tmpArr[0];
-      });
-      const i = savedRollsNames.indexOf(inputName);
-      if (i !== -1) {
-        // found it; roll it
-        let roll = savedRollsArr[i];
-        args = roll.split(" ");
-        cmd = args[1];
-        // be nice if they add the preceding bang, i do it constantly
-        if (cmd.substring(0,1) !== '!') cmd = `!${cmd}`;
-        args.splice(0, 2);
-        //console.log(`cmd: ${cmd} & args: ${args}`);
-        let newContent = `${cmd} ${args.join(" ")}`;
-        logSpam(newContent);
-        handleRollCommand(msg, cmd, args, user, newContent);
-        removeHourglass(msg);
-      }
+  try {
+    await ensureTriplet(msg);
+    const parentFolderID = await findUserFolderDBIDFromMsg(msg);
+    if (parentFolderID === -1) return -1;
+    const savedRollsFileID = await findStringIDByName('savedRolls', parentFolderID);
+    const savedRollsStr = savedRollsFileID === -1 ? '' : await getStringContent(savedRollsFileID);
+    if (!savedRollsStr) {
+      return msg.reply(await addMaintenanceStatusMessage(msg,
+        "You don't have any saved macros in this channel yet."));
     }
+    const macro = savedRollsStr.split('\n').find(line => line.split(/\s+/)[0] === args[0]);
+    if (!macro) {
+      return msg.reply(await addMaintenanceStatusMessage(msg,
+        "That name didn't match any of your saved macros in this channel."));
+    }
+    const [, savedCommand, ...savedArgs] = macro.split(/\s+/);
+    cmd = savedCommand.startsWith('!') ? savedCommand : `!${savedCommand}`;
+    const newContent = `${cmd} ${savedArgs.join(' ')}`;
+    await handleRollCommand(msg, cmd, savedArgs, user, newContent);
+    logWrite(`🎲🎲 ${msg.channel.guild.id}/${msg.channel.id}/${msg.author.id}`);
+  } finally {
+    removeHourglass(msg);
   }
-  else {
-    // savedRolls file didn't exist
-    msg.reply(await addMaintenanceStatusMessage(msg, " you don't have any saved macros in this channel yet."))
-    .catch((e) => { logError(e); });
-  }
-  logWrite(`🎲🎲 ${msg.channel.guild.id}/${msg.channel.id}/${msg.author.id}`);
-  removeHourglass(msg);
 }
 async function handleRemoveMacroCommand(msg, args) {
   if (!msg.channel.guild) {
     msg.reply(`This command doesn't work via DM. You must be in a server channel.`)
-    .catch((e)=>{error.log(e);});
+    .catch(logError);
     return;
   }
   if (args.length < 1)
@@ -206,7 +184,7 @@ async function handleRemoveMacroCommand(msg, args) {
 async function handleListMacrosCommand(msg) {
   if (!msg.channel.guild) {
     msg.reply(`This command doesn't work via DM. You must be in a server channel.`)
-    .catch((e)=>{error.log(e);});
+    .catch(logError);
     return;
   }
   logWrite('\x1b[32m [ ==================== handleListMacrosCommand ================= ]\x1b[0m');

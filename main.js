@@ -54,8 +54,11 @@ async function start() {
   // Setup reaction handler (when 🎲 UI for triggering re-roll is clicked)
   global.bot.on(Discord.Events.MessageReactionAdd, (reaction, user) => {
     if ((reaction.emoji.name == '🎲' || reaction.emoji.name == 'game_die' ||
-          reaction.emoji.name == ':game_die:') && !user.bot && acceptingCommands) {
-      handleMessage(reaction.message, user).catch(logError);
+          reaction.emoji.name == ':game_die:') && !user.bot && acceptingCommands
+        && reaction.message.author && !reaction.message.author.bot
+        && /^!(?:\d+[!t]?|roll)(?=\s|;|$)/i.test(reaction.message.content?.trim() || '')) {
+      handleMessage(reaction.message, user)
+        .catch(error => reportCommandFailure(reaction.message, error));
     }
   });
 
@@ -76,12 +79,23 @@ async function start() {
     // logSpam('Reconnected.');
   });
 
+  async function reportCommandFailure(msg, error) {
+    if (error) logError(error);
+    try {
+      await msg.reply('Something went wrong. Please try your command again. '
+        + "If it keeps happening, contact this bot's maintainer.");
+    } catch (replyError) {
+      logError(replyError);
+    }
+  }
+
   // @ =========== HANDLEMESSAGE FUNCTION ============
   async function handleMessage(msg, user=msg.author) {
+    if (typeof msg.content !== 'string') return;
     // check if message starts with `!`
-    let message = msg.content;
+    let message = msg.content.trim();
     if (message.substring(0, 1) === '!') {
-      let args = message.substring(1).split(' ');
+      let args = message.substring(1).split(/\s+/);
       let cmd = args[0];
       args = args.splice(1);
       cmd = cmd.toLowerCase();
@@ -229,20 +243,16 @@ async function start() {
         break;
       }
       if (handlerStatus === -1) {
-        await msg.reply(
-          `Something went wrong. Please report it at `
-          + `<https://github.com/NathanHawks/SR1eGameBot/issues>\n`
-          + `Include the following in your report:\n\n`
-          + `\`\`\`\ncmd:${cmd}\nargs:${args}\n${new Date()}\`\`\`\n`
-        )
-        .catch((e) => { logError(e); });
-        logError(`Something went wrong; asking for a bug report.`)
+        logError('Command handler returned a failure status.');
+        await reportCommandFailure(msg);
       }
     }
   }
 
   global.bot.on(Discord.Events.MessageCreate, (msg) => {
-    if (acceptingCommands && !msg.author.bot) handleMessage(msg).catch(logError);
+    if (acceptingCommands && !msg.author.bot) {
+      handleMessage(msg).catch(error => reportCommandFailure(msg, error));
+    }
   });
 
   return startBot({

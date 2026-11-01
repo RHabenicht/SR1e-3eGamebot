@@ -8,7 +8,7 @@
  */
 const {
   lastChar, rollDice, getTNFromArgs, getOpposedSetupArr, getModifierFromArgs,
-  addMaintenanceStatusMessage, prepRollNote, makeOpposedOutput
+  addMaintenanceStatusMessage, prepRollNote, makeOpposedOutput, MAX_DICE_PER_POOL
 } = require('./api');
 const {logError, logWrite} = require('./log');
 async function handleRollCommand(msg, cmd, args, user, override=null) {
@@ -17,12 +17,34 @@ async function handleRollCommand(msg, cmd, args, user, override=null) {
   let cmdArr = null;
   if (override !== null) cmdArr = override.split(";");
   else cmdArr = msg.content.split(";");
+  const firstCommand = cmdArr[0].trim().replace(/^!/, '').split(/\s+/)[0];
+  // Keep other bots' formats, such as !3d6, separate from our numeric requests.
+  const looksNumeric = /^\d/.test(firstCommand) && Number.isFinite(Number(firstCommand));
+  if (!/^\d+[!t]?$/i.test(firstCommand) && !looksNumeric) return;
+  if (cmdArr.length > 10) {
+    await msg.reply('Use no more than 10 rolls in one command.');
+    return;
+  }
+  // Validate the entire request before rolling, including opposed pools and macros.
+  for (const section of cmdArr) {
+    const [command, ...rollArgs] = section.trim().replace(/^!/, '').split(/\s+/);
+    const match = /^(\d+)[!t]?$/i.exec(command);
+    const [opposed, opposedCount] = getOpposedSetupArr(rollArgs);
+    if (!match || !Number.isSafeInteger(Number(match[1]))
+        || Number(match[1]) < 1 || Number(match[1]) > MAX_DICE_PER_POOL
+        || (opposed && (!/^\d+$/.test(opposedCount)
+          || !Number.isSafeInteger(Number(opposedCount))
+          || Number(opposedCount) < 1 || Number(opposedCount) > MAX_DICE_PER_POOL))) {
+      await msg.reply(`Each dice pool must be a whole number from 1 to ${MAX_DICE_PER_POOL}.`);
+      return;
+    }
+  }
   let output = '';
   for (let x = 0; x < cmdArr.length; x++) {
     if (output !== '') output += `\nRoll #${x+1}: `;
     // kill preceding or trailing space before it kills my parsing
     cmdArr[x] = cmdArr[x].trim();
-    args = cmdArr[x].split(' ');
+    args = cmdArr[x].split(/\s+/);
     cmd = args[0];
     args = args.splice(1);
     cmd = cmd.toLowerCase();
@@ -103,7 +125,7 @@ async function handleRollCommand(msg, cmd, args, user, override=null) {
     // modify output for maintenance mode status
     output = await addMaintenanceStatusMessage(msg, output);
     // post results
-    msg.channel.send(output).catch((e) => { logError(e); });
+    await msg.channel.send(output);
     // log activity
     logWrite('🎲');
     // provide reroll ui (dice reaction)
