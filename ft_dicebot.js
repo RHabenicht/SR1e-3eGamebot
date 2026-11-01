@@ -11,6 +11,20 @@ const {
   addMaintenanceStatusMessage, prepRollNote, makeOpposedOutput, MAX_DICE_PER_POOL
 } = require('./api');
 const {logError, logWrite} = require('./log');
+function splitRollOutput(output) {
+  const messages = [];
+  while (output.length > 2000) {
+    const boundary = Math.max(output.lastIndexOf('\n', 1999),
+      output.lastIndexOf(',', 1999), output.lastIndexOf(' ', 1999));
+    let end = boundary >= 1000 ? boundary + 1 : 2000;
+    const lastCodeUnit = output.charCodeAt(end - 1);
+    if (lastCodeUnit >= 0xD800 && lastCodeUnit <= 0xDBFF) end--;
+    messages.push(output.slice(0, end));
+    output = output.slice(end);
+  }
+  if (output) messages.push(output);
+  return messages;
+}
 async function handleRollCommand(msg, cmd, args, user, override=null) {
   let numDiceInt = 0;
   // allow multiple roll commands separated by semicolon
@@ -125,7 +139,7 @@ async function handleRollCommand(msg, cmd, args, user, override=null) {
     // modify output for maintenance mode status
     output = await addMaintenanceStatusMessage(msg, output);
     // post results
-    await msg.channel.send(output);
+    for (const message of splitRollOutput(output)) await msg.channel.send(message);
     // log activity
     logWrite('🎲');
     // provide reroll ui (dice reaction)

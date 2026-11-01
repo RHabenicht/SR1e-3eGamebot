@@ -658,7 +658,7 @@ function prepRollNote(cmd, args, tnInt) {
   else if (tnInt > 0) note = "(TN" + tnInt + ")";
   return note;
 }
-const MAX_DICE_PER_POOL = 100;
+const MAX_DICE_PER_POOL = 1000;
 function validateDicePoolSize(count) {
   const size = Number(count);
   if (!Number.isSafeInteger(size) || size < 0 || size > MAX_DICE_PER_POOL) {

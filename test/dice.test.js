@@ -20,7 +20,10 @@ function diceFixture(rolls) {
   const messages = [], reactions = [], replies = [];
   const user = {toString: () => '<@player>'};
   const message = content => ({content, author: user,
-    channel: {send: async value => messages.push(value)},
+    channel: {send: async value => {
+      assert.ok(value.length <= 2000, 'Discord messages must fit its content limit');
+      messages.push(value);
+    }},
     react: async value => reactions.push(value), reply: async value => replies.push(value)});
   return {api, dice, messages, reactions, replies, user, message};
 }
@@ -57,13 +60,13 @@ test('opposed tests without an opponent target number return existing user guida
   assert.match(fixture.replies[0], /opponent TN/);
 });
 
-for (const content of ['!1000000000', '!2.5', '!1e9', '!0', '!2 vs999999999', '!1; nope']) {
+for (const content of ['!1001', '!1000000000', '!2.5', '!1e9', '!0', '!2 vs1001', '!2 vs999999999', '!1; nope']) {
   test(`rejects an invalid or oversized dice request before rolling: ${content}`, async () => {
     const f = diceFixture([]);
     await f.dice.handleRollCommand(f.message(content), '', [], f.user);
     assert.equal(f.messages.length, 0);
     assert.equal(f.replies.length, 1);
-    assert.match(f.replies[0], /whole number.*1.*100/);
+    assert.match(f.replies[0], /whole number.*1.*1000/);
     assert.deepEqual(f.reactions, []);
   });
 }
@@ -77,9 +80,58 @@ test('rejects excessive semicolon-separated rolls before consuming any dice', as
 });
 
 test('dice pools at the supported maximum still roll normally', async () => {
-  const f = diceFixture(Array(100).fill(4));
-  await f.dice.handleRollCommand(f.message('!100 tn4'), '100', ['tn4'], f.user);
-  assert.match(f.messages[0], /100 successes/);
+  const f = diceFixture(Array(1000).fill(4));
+  await f.dice.handleRollCommand(f.message('!1000 tn4'), '1000', ['tn4'], f.user);
+  assert.match(f.messages.join(''), /1000 successes/);
+  assert.ok(f.messages.every(message => message.length <= 2000));
+});
+
+test('880-dice rolls remain supported', async () => {
+  const f = diceFixture(Array(880).fill(4));
+  await f.dice.handleRollCommand(f.message('!880 tn4'), '880', ['tn4'], f.user);
+  assert.match(f.messages.join(''), /880 successes/);
+  assert.deepEqual(f.replies, []);
+  assert.deepEqual(f.reactions, ['🎲']);
+});
+
+test('large Rule of Six results are delivered completely across bounded messages', async () => {
+  const f = diceFixture(Array.from({length: 880}, () => [6, 4]).flat());
+  await f.dice.handleRollCommand(f.message('!880! tn8'), '880!', ['tn8'], f.user);
+  const output = f.messages.join('');
+  assert.match(output, /880 successes/);
+  assert.ok(output.includes('(' + Array(880).fill(10).join(',') + ')'));
+  assert.ok(f.messages.length > 1);
+  assert.ok(f.messages.every(message => message.length <= 2000));
+});
+
+test('opposed 880-dice pools preserve both complete result lists', async () => {
+  const f = diceFixture([...Array(880).fill(4), ...Array(880).fill(2)]);
+  await f.dice.handleRollCommand(f.message('!880 tn4 vs880 otn4'), '880', [], f.user);
+  const output = f.messages.join('');
+  assert.match(output, /880 net successes/);
+  assert.ok(output.includes('(' + Array(880).fill(4).join(',') + ') vs ('
+    + Array(880).fill(2).join(',') + ')'));
+  assert.ok(f.messages.length > 1);
+  assert.ok(f.messages.every(message => message.length <= 2000));
+});
+
+test('saved rolls can use an 880-dice pool', async () => {
+  const f = diceFixture(Array(880).fill(4));
+  await f.dice.handleRollCommand(f.message('!roll largepool'), '880', [], f.user, '!880 tn4');
+  assert.match(f.messages.join(''), /880 successes/);
+  assert.deepEqual(f.replies, []);
+});
+
+test('splitting long output preserves Unicode notes without breaking surrogate pairs', async () => {
+  const f = diceFixture(Array.from({length: 880}, () => [6, 4]).flat());
+  const note = '🎲'.repeat(700);
+  await f.dice.handleRollCommand(f.message(`!880! tn8 ${note}`), '880!', [], f.user);
+  assert.ok(f.messages.join('').includes(note));
+  assert.ok(f.messages.every(message => message.length <= 2000));
+  for (const message of f.messages) {
+    assert.equal(/[\uD800-\uDBFF]$/.test(message), false);
+    assert.equal(/^[\uDC00-\uDFFF]/.test(message), false);
+  }
 });
 
 test('roll arguments accept tabs and repeated spaces', async () => {

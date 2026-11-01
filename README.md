@@ -156,7 +156,7 @@ GameBot connects out to Discord. It doesn't run a website or expose an HTTP heal
 
 All commands start with `!`. Capitalization doesn't matter.
 
-Dice commands accept up to **100 dice per pool**, including the opponent's pool, and **10 rolls per command**. Invalid dice counts are rejected before any dice are rolled.
+Dice commands accept up to **1,000 dice per pool**, including the opponent's pool, and **10 rolls per command**. Invalid dice counts are rejected before any dice are rolled. Large results are delivered across multiple messages.
 
 ### Basic rolls
 
