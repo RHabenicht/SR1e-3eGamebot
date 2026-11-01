@@ -9,6 +9,13 @@ contents in `sr1egamebot`. It preserves record IDs, parent links, names of strin
 records, encryption flags, and plaintext system/legacy records. It does not log
 plaintext, keys, tokens, MongoDB connection strings, or raw driver errors.
 
+An older failed folder creation can leave a BSON null folder name. Null contains
+no encrypted bytes to rotate. The tool preserves that exact null, the folder ID,
+all parent links, and every child record; any encrypted label or child content
+still rotates. Counts report `preservedNullFolderNames` explicitly. This does
+not reconstruct the missing Discord ID or make previously unreachable data
+addressable. Empty, absent, non-string, or malformed non-null names still fail.
+
 The runtime algorithm and database format stay the same. Key rotation does not
 add authenticated encryption or repair previously corrupted records. Preflight
 refuses records it cannot decrypt, unexpected schemas, or an incorrect old IV.

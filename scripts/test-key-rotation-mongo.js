@@ -21,6 +21,9 @@ async function integration(env = process.env) {
     // Create our own collections before beginning any transaction.
     for (const name of Object.values(names)) await db.createCollection(name);
     const original = fixture();
+    // This legacy case exists in the deployed DB: retain the null folder and
+    // its children, rather than inventing a missing Discord identifier.
+    original.folders[1].name = null;
     await store.table('folders').insertMany(original.folders);
     await store.table('strings').insertMany(original.strings);
     assert.equal((await store.dryRun(from, to)).status, 'dry-run');
