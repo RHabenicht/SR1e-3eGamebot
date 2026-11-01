@@ -1,3 +1,13 @@
+/*
+ * SR1e-3eGamebot
+ * Legacy duplicate-record maintenance; back up the database before manual use.
+ *
+ * Maintained by NightLife (RHabenicht).
+ * Original GameBot code by Nathan Hawks (AstroMacGuffin).
+ * https://github.com/NathanHawks/SR1eGameBot
+ * Released under the terms of the UnLicense. This work is in the public domain.
+ * Released as-is with no warranty or claim of usability for any purpose.
+ */
 const {Database} = require('./db');
 const {logWrite, logError} = require('./log');
 const {getParentFolder, sleep, decrypt} = require('./api');

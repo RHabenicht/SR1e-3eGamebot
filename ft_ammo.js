@@ -1,8 +1,10 @@
 /*
- * Shadowrun 1e GameBot by Discord user AstroMacGuffin#1486 (Nathan Hawks)
+ * SR1e-3eGamebot
+ * Weapon, magazine, ammunition, and reload command handlers.
+ *
+ * Maintained by NightLife (RHabenicht).
+ * Original GameBot code by Nathan Hawks (AstroMacGuffin).
  * https://github.com/NathanHawks/SR1eGameBot
- * Yes I do regret baking 1e into the name
- * version 0.3, yeah that sounds good
  * Released under the terms of the UnLicense. This work is in the public domain.
  * Released as-is with no warranty or claim of usability for any purpose.
  */

@@ -1,3 +1,13 @@
+/*
+ * SR1e-3eGamebot
+ * Legacy plaintext-to-ciphertext conversion; use docs/key-rotation.md for key rotation.
+ *
+ * Maintained by NightLife (RHabenicht).
+ * Original GameBot code by Nathan Hawks (AstroMacGuffin).
+ * https://github.com/NathanHawks/SR1eGameBot
+ * Released under the terms of the UnLicense. This work is in the public domain.
+ * Released as-is with no warranty or claim of usability for any purpose.
+ */
 const {Database, db} = require('./db');
 const {encrypt} = require('./api');
 const {ObjectId} = require('mongodb');
