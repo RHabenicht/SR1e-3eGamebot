@@ -13,7 +13,7 @@ test('rotation preserves plaintext, record IDs, parent links, optional labels an
   const plan = planRotation(original, from, to);
   assert.deepEqual(original, copy);
   assert.deepEqual(plan.counts, {folders: 6, strings: 4, encryptedFolders: 3,
-    encryptedStrings: 3, encryptedLabels: 1, fields: 7, identityAnchors: 3});
+    encryptedStrings: 3, encryptedLabels: 1, fields: 7, identityAnchors: 3, preservedNullFolderNames: 0});
   const after = clone(original);
   for (const change of plan.changes) {
     const doc = after[change.collection].find(doc => doc._id.equals(change.recordId));
@@ -82,7 +82,7 @@ test('writes require a stopped bot, named backup, and transaction support', asyn
 
 test('diagnosis identifies damaged fields and references without writing or exposing values', async () => {
   const snapshot = fixture(), privateValue = 'private malformed saved content';
-  snapshot.folders[1].name = null;
+  delete snapshot.folders[1].name;
   snapshot.strings[0].content = privateValue;
   const f = memoryClient(snapshot), store = new RotationStore(f.client);
   const result = await store.diagnose(from);
@@ -91,7 +91,7 @@ test('diagnosis identifies damaged fields and references without writing or expo
   assert.equal(result.transactionsSupported, true);
   assert.equal(result.issues.length, 2);
   const folder = result.issues.find(issue => issue.collection === 'folders');
-  assert.equal(folder.storedType, 'null');
+  assert.equal(folder.storedType, 'undefined');
   assert.equal(folder.childRecords, 1);
   assert.equal(folder.field, 'name');
   assert.match(folder.recordRef, /^[a-f0-9]{16}$/);
@@ -100,6 +100,32 @@ test('diagnosis identifies damaged fields and references without writing or expo
     snapshot.folders[1].label]) assert.equal(printed.includes(value), false);
   assert.equal(f.stats.writes + f.stats.creates + f.stats.indexes, 0);
   assert.equal(parseArgs(['--diagnose'], {}).mode, 'diagnose');
+});
+
+test('a legacy null folder retains its name, ID and child data through rotation and rollback', async () => {
+  const original = fixture();
+  original.folders[1].name = null;
+  original.strings.push({_id: new ObjectId(), parent: original.folders[1]._id,
+    name: 'legacy-child', encrypted: true, content: encryptText('preserve this saved data', from)});
+  const f = memoryClient(original), store = new RotationStore(f.client);
+  const diagnostic = await store.diagnose(from);
+  assert.equal(diagnostic.preflight, 'verified');
+  assert.equal(diagnostic.issues.length, 0);
+  assert.equal(diagnostic.preservedNullFolderNames, 1);
+  const result = await store.apply(from, to, options);
+  assert.equal(result.counts.preservedNullFolderNames, 1);
+  assert.equal(f.data.folders[1].name, null);
+  assert.equal(decryptText(f.data.folders[1].label, to), 'NightLife’s table');
+  const child = f.data.strings.find(doc => doc.name === 'legacy-child');
+  assert.equal(child.parent.equals(original.folders[1]._id), true);
+  assert.equal(decryptText(child.content, to), 'preserve this saved data');
+  assert.equal((await store.inspect(to)).completedRotation, true);
+  await store.rollback(from, to, options);
+  assert.deepEqual({folders: f.data.folders, strings: f.data.strings}, original);
+  for (const invalid of ['', 'not encrypted', 0, undefined]) {
+    const bad = fixture(); bad.folders[1].name = invalid;
+    assert.throws(() => planRotation(bad, from, to), code('INVALID_CIPHERTEXT'));
+  }
 });
 
 test('a write failure aborts all data and rollback-journal changes', async () => {
