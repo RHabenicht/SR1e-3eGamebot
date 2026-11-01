@@ -446,6 +446,8 @@ The list shows reminder IDs and recipients. Long lists may be split across multi
 
 Use the reminder IDs returned by `!listreminders`.
 
+You can cancel reminders you created for the current play channel. The reply reports how many reminders were cancelled.
+
 ## Ammo Tracking
 
 Ammo tracking stores weapon capacity, compatible ammunition, and maximum rate of fire. Enter the values from the rules and weapon you're using.

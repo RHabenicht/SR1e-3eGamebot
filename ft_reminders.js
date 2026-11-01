@@ -171,50 +171,38 @@ async function handleCancelReminderCommand(msg, args) {
     .catch((err)=>{logError(err);});
     return;
   }
-  // loop thru shortIDs
-  for (let x = 0; x < shortIDs.length; x++) {
-    // find reminder in global.reminders
-    for (let y = 0; y < global.reminders.length; y++) {
-      if (global.reminders[y].shortID === shortIDs[x]) {
-        // clearTimeout
-        clearTimeout(global.reminders[y].timeoutID);
-        // splice the element from global.reminders
-        global.reminders.splice(y, 1);
-        // decrement because next item just became current item
-        y--;
+  try {
+    await ensureTriplet(msg);
+    const playChannelID = await getPlayChannel(msg);
+    const userFolderID = await findUserFolderDBIDFromMsg(msg, true);
+    if (userFolderID === -1) return -1;
+    const ownsReminder = reminder => reminder.gmID === msg.author.id
+      && reminder.playChannelID === playChannelID
+      && reminder.userFolderID === userFolderID;
+    const requestedIDs = new Set(shortIDs);
+    let cancelled = 0;
+    for (let i = global.reminders.length - 1; i >= 0; i--) {
+      const reminder = global.reminders[i];
+      if (ownsReminder(reminder) && requestedIDs.has(reminder.shortID)) {
+        clearTimeout(reminder.timeoutID);
+        global.reminders.splice(i, 1);
+        cancelled++;
       }
     }
-  }
-  // update files from what's left of global.reminders
-  // system folder first
-  let saveString = '';
-  for (let x = 0; x < global.reminders.length; x++) {
-    if (saveString !== '') saveString += '\n';
-    saveString += _makeReminderSaveString(global.reminders[x]);
-  }
-  let filename = 'activeReminders';
-  await setStringByNameAndParent(filename, global.folderID.reminders, saveString);
-  // user folder last
-  saveString = '';
-  await ensureTriplet(msg);
-  const playChannelID = await getPlayChannel(msg);
-  for (let x = 0; x < global.reminders.length; x++) {
-    if (saveString !== '') saveString += '\n';
-    if (global.reminders[x].gmID === msg.author.id
-      && global.reminders[x].playChannelID == playChannelID)
-    {
-      saveString += _makeReminderSaveString(global.reminders[x]);
+    if (cancelled === 0) {
+      await msg.reply('No matching reminders found in this channel.').catch(logError);
+      return;
     }
+    await setStringByNameAndParent('activeReminders', global.folderID.reminders,
+      global.reminders.map(_makeReminderSaveString).join('\n'));
+    await setStringByNameAndParent('gmReminders', userFolderID,
+      global.reminders.filter(ownsReminder).map(_makeReminderSaveString).join('\n'));
+    await msg.reply(`${cancelled} reminder${cancelled === 1 ? '' : 's'} cancelled.`)
+      .catch(logError);
+    logWrite(`🎲🎲🎲 ${msg.channel.guild.id}/${msg.channel.id}(${playChannelID})/${msg.author.id}`);
+  } finally {
+    removeHourglass(msg);
   }
-  filename = 'gmReminders';
-  let userFolderID = await findUserFolderDBIDFromMsg(msg, true);
-  if (userFolderID === -1) return -1;
-  await setStringByNameAndParent(filename, userFolderID, saveString);
-  // user feedback
-  msg.reply(`${shortIDs.length} reminder cancellations were requested.`)
-  .catch((err) => {console.error(err);});
-  removeHourglass(msg);
-  logWrite(`🎲🎲🎲 ${msg.channel.guild.id}/${msg.channel.id}(${playChannelID})/${msg.author.id}`);
 }
 module.exports = {
   handleListRemindersCommand, handleAddReminderCommand,
