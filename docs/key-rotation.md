@@ -25,6 +25,11 @@ or 2 MiB per projected document need a separately reviewed migration.
 3. In the service's interactive Shell, run `npm run crypto:rotate -- --verify`.
    It only reads production records. Require `status: verified` and
    `transactionsSupported: true` before continuing.
+   If verification fails, `--diagnose` (or the `cryptodiagnose` process) reports
+   field types, lengths, hashed record references, and child-record counts.
+   It performs no writes and never prints record values, raw IDs, or keys.
+   Investigate and preserve malformed records; do not skip or delete them to
+   force migration through.
 4. Run `npm run test:rotation-mongo`. This exercises real transaction failure,
    migration, verification, and rollback using four randomly named synthetic
    collections, then deletes only those collections. It never reads the bot's
