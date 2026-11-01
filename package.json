@@ -13,7 +13,10 @@
   "scripts": {
     "start": "node main.js",
     "check": "node scripts/check-syntax.js",
-    "test": "node --test \"test/*.test.js\""
+    "test": "node --test \"test/*.test.js\"",
+    "crypto:rotate": "node scripts/rotate-encryption-key.js",
+    "crypto:keys": "node scripts/rotate-encryption-key.js --generate-keys",
+    "test:rotation-mongo": "node scripts/test-key-rotation-mongo.js"
   },
   "dependencies": {
     "discord.js": "^14.27.0",
