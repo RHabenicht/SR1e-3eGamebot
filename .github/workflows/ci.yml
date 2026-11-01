@@ -20,6 +20,30 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run check
       - run: npm test
+      - name: Start isolated MongoDB replica set for rotation tests
+        run: |
+          docker run --name rotation-mongo --detach --publish 127.0.0.1:27017:27017 mongo:7.0 mongod --replSet rs0 --bind_ip_all
+          for attempt in {1..30}; do
+            if docker exec rotation-mongo mongosh --quiet --eval 'quit(db.adminCommand({ping: 1}).ok ? 0 : 1)'; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec rotation-mongo mongosh --quiet --eval 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]})'
+          for attempt in {1..30}; do
+            if docker exec rotation-mongo mongosh --quiet --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+      - name: Test real database migration and rollback
+        run: npm run test:rotation-mongo
+        env:
+          MONGODB_URI: mongodb://localhost:27017/?replicaSet=rs0
+      - name: Remove isolated test server
+        if: always()
+        run: docker rm --force rotation-mongo || true
       - run: npm audit --omit=dev --audit-level=high
       - name: Check install reproducibility
         run: |
