@@ -658,7 +658,16 @@ function prepRollNote(cmd, args, tnInt) {
   else if (tnInt > 0) note = "(TN" + tnInt + ")";
   return note;
 }
+const MAX_DICE_PER_POOL = 1000;
+function validateDicePoolSize(count) {
+  const size = Number(count);
+  if (!Number.isSafeInteger(size) || size < 0 || size > MAX_DICE_PER_POOL) {
+    throw new RangeError(`Dice pools must contain between 0 and ${MAX_DICE_PER_POOL} dice.`);
+  }
+  return size;
+}
 function rollDice(numDiceInt, isTestBool, tnInt) {
+  numDiceInt = validateDicePoolSize(numDiceInt);
   let rollsIntArr = [];
   let successesInt = 0;
   for (x = 0; x < numDiceInt; x++) {
@@ -671,6 +680,7 @@ function rollDice(numDiceInt, isTestBool, tnInt) {
   return [successesInt,rollsIntArr];
 }
 function rollD10s(numDiceInt) {
+  numDiceInt = validateDicePoolSize(numDiceInt);
   let rollsIntArr = [];
   for (x = 0; x < numDiceInt; x++) {
     rollsIntArr[x] = d10();
@@ -1273,7 +1283,7 @@ module.exports = {
   firstTwoLC, firstThreeLC, lastChar, getTNFromArgs, getModifierFromArgs,
   sortNumberDesc, sortReaction, sortInitPass, sortCPRTiebreaker,
   sort1ETiebreaker, getOpposedSetupArr, makeOpposedOutput, prepRollNote,
-  rollDice, rollD10s, modifyNPCInput, validateNPCInput, getPlayChannel,
+  rollDice, rollD10s, MAX_DICE_PER_POOL, modifyNPCInput, validateNPCInput, getPlayChannel,
   getUserReminders, getActiveReminders, addReminders,
   getSceneList, updateSceneList, deleteSceneFromList, saveSceneList,
   addMaintenanceStatusMessage, sleep, getUserOption, setUserOption,

@@ -6,7 +6,8 @@ const Discord = require('discord.js');
 const startup = require('../startup');
 const {loadModule} = require('./helpers/load-module');
 
-function makeBot({login, roll = async () => {}, initialize = async () => {}} = {}) {
+function makeBot({login, roll = async () => {}, initialize = async () => {},
+  handlers = {}} = {}) {
   const calls = [], errors = [], replies = [], adminCalls = [];
   let client;
   class FakeClient extends EventEmitter {
@@ -47,7 +48,9 @@ function makeBot({login, roll = async () => {}, initialize = async () => {}} = {
     './ft_dicebot': {handleRollCommand: roll}
   };
   for (const file of ['ft_ammo', 'ft_gmscreen', 'ft_help', 'ft_initiative',
-    'ft_macro', 'ft_reminders', 'ft_scene', 'ft_misc']) stubs[`./${file}`] = {};
+    'ft_macro', 'ft_reminders', 'ft_scene', 'ft_misc']) {
+    stubs[`./${file}`] = handlers[file] || {};
+  }
   const {exports} = loadModule('main.js', stubs);
   const message = {content: '!3', author: {id: 'player', bot: false},
     reply: async value => replies.push(value)};
@@ -87,6 +90,7 @@ test('awaits asynchronous command status before sending the failure response', a
   await nextTurn();
   assert.equal(bot.replies.length, 1);
   assert.match(bot.replies[0], /Something went wrong/);
+  assert.doesNotMatch(bot.replies[0], /NathanHawks|args:|cmd:/);
 });
 
 test('handles rejected asynchronous commands without an unhandled rejection', async () => {
@@ -96,6 +100,46 @@ test('handles rejected asynchronous commands without an unhandled rejection', as
   bot.client.emit(Discord.Events.MessageCreate, bot.message);
   await nextTurn();
   assert.deepEqual(bot.errors, [failure]);
+  assert.equal(bot.replies.length, 1);
+  assert.match(bot.replies[0], /Something went wrong/);
+});
+
+test('a failure response does not repeat command arguments or internal errors', async () => {
+  const failure = new Error('private connection details');
+  const bot = makeBot({roll: async () => { throw failure; }});
+  await bot.start();
+  bot.client.emit(Discord.Events.MessageCreate,
+    {...bot.message, content: '!3 private-command-note'});
+  await nextTurn();
+  assert.equal(bot.replies.length, 1);
+  assert.doesNotMatch(bot.replies[0], /private-command-note|private connection details/);
+});
+
+test('a rejected failure reply is logged without trying to reply again', async () => {
+  const failure = new Error('command failed');
+  const replyFailure = new Error('cannot send messages');
+  const bot = makeBot({roll: async () => { throw failure; }});
+  await bot.start();
+  let attempts = 0;
+  bot.client.emit(Discord.Events.MessageCreate, {...bot.message, reply: async () => {
+    attempts++;
+    throw replyFailure;
+  }});
+  await nextTurn();
+  assert.equal(attempts, 1);
+  assert.deepEqual(bot.errors, [failure, replyFailure]);
+});
+
+test('command arguments tolerate repeated spaces and tabs', async () => {
+  const inputs = [];
+  const bot = makeBot({handlers: {ft_macro: {
+    handleRollMacroCommand: async (_msg, _cmd, args) => inputs.push(Array.from(args))
+  }}});
+  await bot.start();
+  bot.client.emit(Discord.Events.MessageCreate,
+    {...bot.message, content: '!roll\t  dodge  '});
+  await nextTurn();
+  assert.deepEqual(inputs, [['dodge']]);
 });
 
 test('human rerolls retain the reacting user and bot messages/reactions are ignored', async () => {
@@ -105,7 +149,41 @@ test('human rerolls retain the reacting user and bot messages/reactions are igno
   bot.client.emit(Discord.Events.MessageCreate, {...bot.message, author: {id: 'bot', bot: true}});
   const reaction = {emoji: {name: '🎲'}, message: bot.message};
   bot.client.emit(Discord.Events.MessageReactionAdd, reaction, {id: 'bot', bot: true});
+  bot.client.emit(Discord.Events.MessageReactionAdd,
+    {...reaction, message: {...bot.message, author: {id: 'bot', bot: true}}},
+    {id: 'reroller', bot: false});
   bot.client.emit(Discord.Events.MessageReactionAdd, reaction, {id: 'reroller', bot: false});
+  await nextTurn();
+  assert.deepEqual(users, ['reroller']);
+});
+
+test('dice reactions cannot repeat settings or deletion commands', async () => {
+  const calls = [];
+  const bot = makeBot({handlers: {
+    ft_initiative: {handleSetPlayersCommand: async () => calls.push('setplayers')},
+    ft_macro: {handleRemoveMacroCommand: async () => calls.push('rmm')},
+    ft_scene: {handleDelSceneCommand: async () => calls.push('delscene')}
+  }});
+  await bot.start();
+  for (const command of ['!setplayers <@player>', '!rmm dodge', '!delscene warehouse']) {
+    const message = {...bot.message, content: command};
+    bot.client.emit(Discord.Events.MessageCreate, message);
+    bot.client.emit(Discord.Events.MessageReactionAdd,
+      {emoji: {name: '🎲'}, message}, {id: 'other-player', bot: false});
+  }
+  await nextTurn();
+  assert.deepEqual(calls, ['setplayers', 'rmm', 'delscene']);
+});
+
+test('dice reactions still repeat saved rolls for the reacting player', async () => {
+  const users = [];
+  const bot = makeBot({handlers: {ft_macro: {
+    handleRollMacroCommand: async (_msg, _cmd, _args, user) => users.push(user.id)
+  }}});
+  await bot.start();
+  bot.client.emit(Discord.Events.MessageReactionAdd,
+    {emoji: {name: '🎲'}, message: {...bot.message, content: '!roll dodge'}},
+    {id: 'reroller', bot: false});
   await nextTurn();
   assert.deepEqual(users, ['reroller']);
 });
