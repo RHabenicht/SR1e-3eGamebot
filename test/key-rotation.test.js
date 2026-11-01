@@ -80,6 +80,28 @@ test('writes require a stopped bot, named backup, and transaction support', asyn
   assert.equal(f.stats.writes + f.stats.creates, 0);
 });
 
+test('diagnosis identifies damaged fields and references without writing or exposing values', async () => {
+  const snapshot = fixture(), privateValue = 'private malformed saved content';
+  snapshot.folders[1].name = null;
+  snapshot.strings[0].content = privateValue;
+  const f = memoryClient(snapshot), store = new RotationStore(f.client);
+  const result = await store.diagnose(from);
+  assert.equal(result.status, 'diagnostic');
+  assert.equal(result.preflight, 'INVALID_CIPHERTEXT');
+  assert.equal(result.transactionsSupported, true);
+  assert.equal(result.issues.length, 2);
+  const folder = result.issues.find(issue => issue.collection === 'folders');
+  assert.equal(folder.storedType, 'null');
+  assert.equal(folder.childRecords, 1);
+  assert.equal(folder.field, 'name');
+  assert.match(folder.recordRef, /^[a-f0-9]{16}$/);
+  const printed = JSON.stringify(result);
+  for (const value of [privateValue, snapshot.folders[1]._id.toHexString(), from.key.toString('hex'),
+    snapshot.folders[1].label]) assert.equal(printed.includes(value), false);
+  assert.equal(f.stats.writes + f.stats.creates + f.stats.indexes, 0);
+  assert.equal(parseArgs(['--diagnose'], {}).mode, 'diagnose');
+});
+
 test('a write failure aborts all data and rollback-journal changes', async () => {
   const initial = fixture(), f = memoryClient(initial), store = new RotationStore(f.client);
   f.failNextWrite(4); // The run, journal and first folder write succeed before this failure.

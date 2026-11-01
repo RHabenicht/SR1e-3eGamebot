@@ -10,6 +10,7 @@ function parseArgs(args, env = process.env) {
     switch (args[i]) {
       case '--apply': options.mode = 'apply'; modes++; break;
       case '--verify': options.mode = 'verify'; modes++; break;
+      case '--diagnose': options.mode = 'diagnose'; modes++; break;
       case '--rollback': options.mode = 'rollback'; modes++; break;
       case '--generate-keys': options.mode = 'generate'; modes++; break;
       case '--help': options.mode = 'help'; modes++; break;
@@ -34,13 +35,13 @@ async function run(args = process.argv.slice(2), env = process.env, output = pro
   const options = parseArgs(args, env);
   if (options.mode === 'generate') { generateKeys(output); return options; }
   if (options.mode === 'help') {
-    output.write('Default: read-only dry run. Modes: --verify, --apply, --rollback, --generate-keys.\n'
+    output.write('Default: read-only dry run. Modes: --verify, --diagnose, --apply, --rollback, --generate-keys.\n'
       + 'Writes require --acknowledge-bot-stopped and --backup BACKUP_NAME.\n'
       + 'Use --hold only for a Northflank maintenance process. See docs/key-rotation.md.\n');
     return options;
   }
   const from = keyPair(env);
-  const to = options.mode === 'verify' ? null : keyPair(env, true);
+  const to = ['verify', 'diagnose'].includes(options.mode) ? null : keyPair(env, true);
   if (!env.MONGODB_URI) throw new RotationError('MONGODB_URI_REQUIRED');
   const client = new MongoClient(env.MONGODB_URI, {serverSelectionTimeoutMS: 15000});
   let result;
@@ -48,6 +49,7 @@ async function run(args = process.argv.slice(2), env = process.env, output = pro
     await client.connect();
     const store = new RotationStore(client);
     if (options.mode === 'verify') result = await store.inspect(from);
+    else if (options.mode === 'diagnose') result = await store.diagnose(from);
     else if (options.mode === 'apply') result = await store.apply(from, to, options);
     else if (options.mode === 'rollback') result = await store.rollback(from, to, options);
     else result = await store.dryRun(from, to);
